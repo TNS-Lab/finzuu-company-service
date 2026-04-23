@@ -17,9 +17,14 @@ class Settings(BaseSettings):
     DB_CONNECTION: str
 
     DEFAULT_LICENSE_DURATION_DAYS: int = 365
+    HTTP_CLIENT_TIMEOUT_SECONDS: int = 15
+
     USER_SERVICE_BASE_URL: str = ""
+    USER_SERVICE_CREATE_USER_PATH: str = "/api/v1/users"
     ACCOUNT_SERVICE_BASE_URL: str = ""
+    ACCOUNT_SERVICE_CREATE_ACCOUNT_PATH: str = "/api/v1/accounts"
     NOTIFICATION_SERVICE_BASE_URL: str = ""
+    NOTIFICATION_SERVICE_SEND_EMAIL_PATH: str = "/api/v1/notifications/email"
 
     class Config:
         env_file = './.env'

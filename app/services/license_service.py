@@ -31,6 +31,20 @@ class LicenseService:
 
         return active_license
 
+    async def expire_licenses(self) -> int:
+        expired_licenses = await License.find(
+            {
+                "is_active": True,
+                "end_date": {"$lt": datetime.now(timezone.utc)},
+            }
+        ).to_list()
+
+        for license_document in expired_licenses:
+            license_document.is_active = False
+            await license_document.save_changes()
+
+        return len(expired_licenses)
+
     async def create(self, payload: CreateLicenseSchema) -> License:
         company = await Company.get(payload.company_id)
         active_license = await self.get_active_license(payload.company_id)

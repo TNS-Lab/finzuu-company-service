@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Response, status
 
+from app.exceptions.AppException import AppException
 from app.models.company_model import Company
 from app.schemas.company_schema import CreateCompanySchema, UpdateCompanySchema
 from app.schemas.response_schema import ApiPaginateResponse, ApiResponse
@@ -57,7 +58,16 @@ async def create_company(payload: CreateCompanySchema, response: Response):
             "data": "",
         }
 
-    new_company = await CompanyService().create(payload)
+    try:
+        new_company = await CompanyService().create(payload)
+    except AppException as exc:
+        response.status_code = status.HTTP_502_BAD_GATEWAY
+        return {
+            "status_code": status.HTTP_502_BAD_GATEWAY,
+            "response_type": "Integration Error",
+            "description": exc.message,
+            "data": "",
+        }
 
     return {
         "status_code": status.HTTP_201_CREATED,
