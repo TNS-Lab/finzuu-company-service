@@ -6,9 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: finzuu-company-service
     restart: always
-    command: uvicorn app.main:app --host 0.0.0.0 --port 12041 --reload
-    ports:
-      - '127.0.0.1:12041:12041'
-
+    network_mode: host
+    command: uvicorn app.main:app --host 127.0.0.1 --port 12041 --reload
     volumes:
       - ./:/finzuu
