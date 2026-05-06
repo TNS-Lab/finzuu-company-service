@@ -6,6 +6,7 @@ from app.schemas.company_schema import CreateCompanySchema, UpdateCompanySchema
 from app.schemas.response_schema import ApiPaginateResponse, ApiResponse
 from app.services.company_service import CompanyService
 from app.utils.pagination import get_skip_value, pagination
+from app.utils.serialization import serialize_model, serialize_models
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ async def get_all(limit: int = 10, page: int = 1):
         "status_code": status.HTTP_200_OK,
         "response_type": "Success",
         "description": "Company data retrieved successfully",
-        "data": data,
+        "data": serialize_models(data),
         "paginate": paginate,
     }
 
@@ -42,7 +43,7 @@ async def get(company_id: str, response: Response):
         "status_code": status.HTTP_200_OK,
         "response_type": "Success",
         "description": "Company data retrieved successfully",
-        "data": data,
+        "data": serialize_model(data),
     }
 
 
@@ -73,7 +74,7 @@ async def create_company(payload: CreateCompanySchema, response: Response):
         "status_code": status.HTTP_201_CREATED,
         "response_type": "Success",
         "description": "Company created successfully",
-        "data": new_company,
+        "data": serialize_model(new_company),
     }
 
 
@@ -96,5 +97,5 @@ async def update_company(company_id: str, payload: UpdateCompanySchema, response
         "status_code": status.HTTP_200_OK,
         "response_type": "Success",
         "description": "Company updated",
-        "data": data_updated,
+        "data": serialize_model(data_updated),
     }

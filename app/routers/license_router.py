@@ -8,6 +8,7 @@ from app.services.company_service import CompanyService
 from app.services.license_service import LicenseService
 from app.utils.date import has_expired
 from app.utils.pagination import get_skip_value, pagination
+from app.utils.serialization import serialize_model, serialize_models
 
 router = APIRouter()
 
@@ -22,7 +23,7 @@ async def get_all(limit: int = 10, page: int = 1):
         "status_code": status.HTTP_200_OK,
         "response_type": "Success",
         "description": "License data retrieved successfully",
-        "data": data,
+        "data": serialize_models(data),
         "paginate": paginate,
     }
 
@@ -44,7 +45,7 @@ async def get(license_id: str, response: Response):
         "status_code": status.HTTP_200_OK,
         "response_type": "Success",
         "description": "License data retrieved successfully",
-        "data": data,
+        "data": serialize_model(data),
     }
 
 
@@ -67,8 +68,8 @@ async def get_by_company(company_id: str, response: Response):
         "response_type": "Success",
         "description": "Company licenses retrieved successfully",
         "data": {
-            "company": company,
-            "licenses": licenses,
+            "company": serialize_model(company),
+            "licenses": serialize_models(licenses),
             "has_active_license": any(license.is_active and not has_expired(license.end_date) for license in licenses),
         },
     }
@@ -102,5 +103,5 @@ async def create_license(payload: CreateLicenseSchema, response: Response):
         "status_code": status.HTTP_201_CREATED,
         "response_type": "Success",
         "description": "License created successfully",
-        "data": new_license,
+        "data": serialize_model(new_license),
     }

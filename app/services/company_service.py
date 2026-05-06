@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional
 
 from app.configs import logger
@@ -44,9 +45,10 @@ class CompanyService:
         )
         await company.insert()
 
-        await self._create_company_admin(company, payload)
+        temp_password = generate_key(12)
+        await self._create_company_admin(company, payload, temp_password)
         await self._create_company_operation_account(company)
-        await self._send_company_creation_notification(company, payload)
+        await self._send_company_creation_notification(company, payload, temp_password)
 
         return company
 
@@ -60,19 +62,17 @@ class CompanyService:
         await company.save_changes()
         return company
 
-    async def _create_company_admin(self, company: Company, payload: CreateCompanySchema) -> dict:
-        temp_password = generate_key(12)
-        admin_username = f"{payload.admin_first_name}.{payload.admin_last_name}".replace(" ", ".").lower()
+    async def _create_company_admin(self, company: Company, payload: CreateCompanySchema, temp_password: str) -> dict:
+        admin_username = self._build_admin_username(payload.admin_first_name, payload.admin_last_name)
 
         user_payload = {
             "user_name": admin_username,
             "email": payload.admin_email,
             "password": temp_password,
             "type_user": "COMPANY",
-            "groupe": "ADMIN",
+            "groupes": ["ADMIN"],
             "identity": company.name,
             "company_id": company.id,
-            "mfa": "EMAIL",
         }
 
         return await self.integration_service.post(
@@ -109,7 +109,12 @@ class CompanyService:
             service_name="Account service",
         )
 
-    async def _send_company_creation_notification(self, company: Company, payload: CreateCompanySchema) -> dict:
+    async def _send_company_creation_notification(
+        self,
+        company: Company,
+        payload: CreateCompanySchema,
+        temp_password: str,
+    ) -> dict:
         if not settings.NOTIFICATION_SERVICE_BASE_URL:
             logger.info("Notification service base url is not configured. Notification skipped for company %s", company.id)
             return {}
@@ -124,6 +129,7 @@ class CompanyService:
                 "company_short_name": company.short_name,
                 "admin_first_name": payload.admin_first_name,
                 "admin_last_name": payload.admin_last_name,
+                "temporary_password": temp_password,
             },
         }
 
@@ -137,3 +143,10 @@ class CompanyService:
         except AppException as exc:
             logger.warning("Company %s created but notification failed: %s", company.id, exc.message)
             return {}
+
+    @staticmethod
+    def _build_admin_username(first_name: str, last_name: str) -> str:
+        username = f"{first_name}_{last_name}".strip().lower()
+        username = re.sub(r"[^a-z0-9_-]+", "_", username)
+        username = re.sub(r"_+", "_", username).strip("_-")
+        return username or "company_admin"

@@ -6,5 +6,11 @@ from app.routers.license_router import router as license_router
 
 api_router = APIRouter()
 
+
+@api_router.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 api_router.include_router(company_router, tags=["Company"], prefix="/api/v1/companies")
 api_router.include_router(license_router, tags=["License"], prefix="/api/v1/licenses")
