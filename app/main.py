@@ -23,7 +23,7 @@ app = FastAPI(
     description="Service de gestion des compagnies et de leurs licences",
     version="1.0.1",
     lifespan=lifespan,
-    root_path="/account"
+    root_path="/company"
 )
 
 app.add_middleware(
