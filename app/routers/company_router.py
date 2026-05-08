@@ -99,3 +99,49 @@ async def update_company(company_id: str, payload: UpdateCompanySchema, response
         "description": "Company updated",
         "data": serialize_model(data_updated),
     }
+
+
+@router.patch("/{company_id}/activate", status_code=status.HTTP_200_OK, response_model=ApiResponse)
+async def activate_company(company_id: str, response: Response):
+    data = await CompanyService().get_by_id(company_id)
+
+    if not data:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "status_code": status.HTTP_404_NOT_FOUND,
+            "response_type": "Not Found",
+            "description": "Company not found",
+            "data": "",
+        }
+
+    data_updated = await CompanyService().set_active(company_id, True)
+
+    return {
+        "status_code": status.HTTP_200_OK,
+        "response_type": "Success",
+        "description": "Company activated",
+        "data": serialize_model(data_updated),
+    }
+
+
+@router.patch("/{company_id}/deactivate", status_code=status.HTTP_200_OK, response_model=ApiResponse)
+async def deactivate_company(company_id: str, response: Response):
+    data = await CompanyService().get_by_id(company_id)
+
+    if not data:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "status_code": status.HTTP_404_NOT_FOUND,
+            "response_type": "Not Found",
+            "description": "Company not found",
+            "data": "",
+        }
+
+    data_updated = await CompanyService().set_active(company_id, False)
+
+    return {
+        "status_code": status.HTTP_200_OK,
+        "response_type": "Success",
+        "description": "Company deactivated",
+        "data": serialize_model(data_updated),
+    }

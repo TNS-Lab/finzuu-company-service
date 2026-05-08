@@ -52,6 +52,12 @@ class CompanyService:
 
         return company
 
+    async def set_active(self, company_id: str, is_active: bool) -> Company:
+        company = await self.get_by_id(company_id)
+        company.is_active = is_active
+        await company.save_changes()
+        return company
+
     async def update(self, company_id: str, payload: UpdateCompanySchema) -> Company:
         company = await self.get_by_id(company_id)
         update_data = payload.model_dump(exclude_unset=True)
