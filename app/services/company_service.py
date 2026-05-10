@@ -92,6 +92,13 @@ class CompanyService:
             "identity": company.name,
             "company_id": company.id,
         }
+        logger.info(
+            "Creating company admin user: company_id=%s email=%s type_user=%s groupes=%s",
+            company.id,
+            payload.admin_email,
+            user_payload["type_user"],
+            user_payload["groupes"],
+        )
 
         return await self.integration_service.post(
             base_url=settings.USER_SERVICE_BASE_URL,
@@ -120,6 +127,13 @@ class CompanyService:
             "direct_momo": False,
             "status": "ACTIVE",
         }
+        logger.info(
+            "Creating company operation account: company_id=%s external_class=%s type=%s label=%s",
+            company.id,
+            account_payload["external_class"],
+            account_payload["type"],
+            account_payload["label"],
+        )
 
         return await self.integration_service.post(
             base_url=settings.ACCOUNT_SERVICE_BASE_URL,
