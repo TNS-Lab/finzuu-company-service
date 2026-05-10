@@ -72,14 +72,6 @@ class CompanyService:
         await company.save_changes()
         return company
 
-    async def delete(self, company_id: str) -> bool:
-        company = await self.get_by_id(company_id)
-        if not company:
-            return False
-
-        await company.delete()
-        return True
-
     async def _create_company_admin(self, company: Company, payload: CreateCompanySchema, temp_password: str, auth_token: str | None = None) -> dict:
         admin_username = self._build_admin_username(payload.admin_first_name, payload.admin_last_name)
 

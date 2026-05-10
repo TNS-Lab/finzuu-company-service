@@ -158,23 +158,3 @@ async def deactivate_company(company_id: str, response: Response, __=Depends(req
         "data": serialize_model(data_updated),
     }
 
-
-@router.delete("/{company_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def delete_company(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_UPDATE))):
-    deleted = await CompanyService().delete(company_id)
-
-    if not deleted:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "status_code": status.HTTP_404_NOT_FOUND,
-            "response_type": "Not Found",
-            "description": "Company not found",
-            "data": "",
-        }
-
-    return {
-        "status_code": status.HTTP_200_OK,
-        "response_type": "Success",
-        "description": "Company deleted",
-        "data": "",
-    }

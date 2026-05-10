@@ -273,21 +273,6 @@ async def test_update_company():
     assert response_json["data"]["is_active"] is False
 
 
-@pytest.mark.asyncio
-async def test_delete_company():
-    await initiate_database()
-
-    company = Company(**company_payload())
-    await company.insert()
-
-    response = client.delete(f"/api/v1/companies/{company.id}", headers=AUTH_HEADERS)
-
-    assert response.status_code == 200
-    response_json = response.json()
-    assert response_json["description"] == "Company deleted"
-    assert await Company.get(company.id) is None
-
-
 def test_openapi_documents_industries_and_sectors_as_arrays():
     openapi_schema = client.get("/openapi.json").json()
     company_schema = openapi_schema["components"]["schemas"]["CreateCompanySchema"]
