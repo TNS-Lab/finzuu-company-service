@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.configs.config import settings
 from app.models.company_model import Company
 from app.models.license_model import CompanySnapshot, License, PackageInfo
-from app.schemas.license_schema import CreateLicenseSchema
+from app.schemas.license_schema import CreateLicenseSchema, UpdateLicenseSchema
 from app.utils.date import add_days, has_expired
 
 
@@ -69,4 +69,25 @@ class LicenseService:
             await active_license.save_changes()
 
         await license_document.insert()
+        return license_document
+
+    async def update(self, license_id: str, payload: UpdateLicenseSchema) -> Optional[License]:
+        license_document = await self.get_by_id(license_id)
+        if not license_document:
+            return None
+
+        update_data = payload.model_dump(exclude_unset=True)
+
+        if "duration_days" in update_data and "start_date" not in update_data and "end_date" not in update_data:
+            update_data["end_date"] = add_days(license_document.start_date, update_data["duration_days"])
+
+        update_data.pop("duration_days", None)
+
+        if "packages" in update_data:
+            update_data["packages"] = [PackageInfo(**package) for package in update_data["packages"]]
+
+        for field, value in update_data.items():
+            setattr(license_document, field, value)
+
+        await license_document.save_changes()
         return license_document

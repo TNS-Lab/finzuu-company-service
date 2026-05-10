@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
+from app.auth.permissions import require_permissions
+from app.configs import logger
+from app.enums import Permission
 from app.exceptions.AppException import AppException
 from app.models.company_model import Company
 from app.schemas.company_schema import CreateCompanySchema, UpdateCompanySchema
@@ -12,7 +15,7 @@ router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK, response_model=ApiPaginateResponse)
-async def get_all(limit: int = 10, page: int = 1):
+async def get_all(limit: int = 10, page: int = 1, __=Depends(require_permissions(Permission.COMPANY_COMPANY_READ))):
     skip = get_skip_value(page, limit)
     data = await CompanyService().get_all(skip, limit)
     paginate = await pagination(Company, limit, page)
@@ -27,7 +30,7 @@ async def get_all(limit: int = 10, page: int = 1):
 
 
 @router.get("/{company_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def get(company_id: str, response: Response):
+async def get(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_READ))):
     data = await CompanyService().get_by_id(company_id)
 
     if not data:
@@ -48,7 +51,7 @@ async def get(company_id: str, response: Response):
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ApiResponse)
-async def create_company(payload: CreateCompanySchema, response: Response):
+async def create_company(payload: CreateCompanySchema, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_CREATE))):
     existing_company = await CompanyService().get_by_name_or_short_name(payload.name, payload.short_name)
     if existing_company:
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -62,11 +65,12 @@ async def create_company(payload: CreateCompanySchema, response: Response):
     try:
         new_company = await CompanyService().create(payload)
     except AppException as exc:
+        logger.error("Company creation failed during inter-service orchestration: %s", exc.message)
         response.status_code = status.HTTP_502_BAD_GATEWAY
         return {
             "status_code": status.HTTP_502_BAD_GATEWAY,
             "response_type": "Integration Error",
-            "description": exc.message,
+            "description": "Unable to complete company creation",
             "data": "",
         }
 
@@ -79,7 +83,7 @@ async def create_company(payload: CreateCompanySchema, response: Response):
 
 
 @router.put("/{company_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def update_company(company_id: str, payload: UpdateCompanySchema, response: Response):
+async def update_company(company_id: str, payload: UpdateCompanySchema, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_UPDATE))):
     data_to_update = await CompanyService().get_by_id(company_id)
 
     if not data_to_update:
@@ -102,7 +106,7 @@ async def update_company(company_id: str, payload: UpdateCompanySchema, response
 
 
 @router.patch("/{company_id}/activate", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def activate_company(company_id: str, response: Response):
+async def activate_company(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_ACTIVATE))):
     data = await CompanyService().get_by_id(company_id)
 
     if not data:
@@ -125,7 +129,7 @@ async def activate_company(company_id: str, response: Response):
 
 
 @router.patch("/{company_id}/deactivate", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def deactivate_company(company_id: str, response: Response):
+async def deactivate_company(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_DEACTIVATE))):
     data = await CompanyService().get_by_id(company_id)
 
     if not data:
@@ -144,4 +148,25 @@ async def deactivate_company(company_id: str, response: Response):
         "response_type": "Success",
         "description": "Company deactivated",
         "data": serialize_model(data_updated),
+    }
+
+
+@router.delete("/{company_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
+async def delete_company(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_UPDATE))):
+    deleted = await CompanyService().delete(company_id)
+
+    if not deleted:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "status_code": status.HTTP_404_NOT_FOUND,
+            "response_type": "Not Found",
+            "description": "Company not found",
+            "data": "",
+        }
+
+    return {
+        "status_code": status.HTTP_200_OK,
+        "response_type": "Success",
+        "description": "Company deleted",
+        "data": "",
     }

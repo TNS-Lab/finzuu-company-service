@@ -24,3 +24,17 @@ class CreateLicenseSchema(BaseModel):
         if self.start_date and self.end_date and self.end_date <= self.start_date:
             raise ValueError("end_date must be greater than start_date")
         return self
+
+
+class UpdateLicenseSchema(BaseModel):
+    packages: Optional[List[PackageSchema]] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    duration_days: Optional[int] = Field(default=None, gt=0)
+    is_active: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "UpdateLicenseSchema":
+        if self.start_date and self.end_date and self.end_date <= self.start_date:
+            raise ValueError("end_date must be greater than start_date")
+        return self

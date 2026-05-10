@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     DEFAULT_LICENSE_DURATION_DAYS: int = 365
     HTTP_CLIENT_TIMEOUT_SECONDS: int = 15
 
+    AUTH_API: str = ""
+
     USER_SERVICE_BASE_URL: str = ""
     USER_SERVICE_CREATE_USER_PATH: str = "/api/v1/users"
     ACCOUNT_SERVICE_BASE_URL: str = ""

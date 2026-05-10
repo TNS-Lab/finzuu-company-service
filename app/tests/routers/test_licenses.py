@@ -161,3 +161,33 @@ async def test_get_licenses_by_company():
     assert response_json["data"]["company"]["id"] == company.id
     assert response_json["data"]["licenses"][0]["id"] == license_document.id
     assert response_json["data"]["has_active_license"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_license():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+    license_document = License(
+        start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
+        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        is_active=True,
+    )
+    await license_document.insert()
+
+    response = client.put(
+        f"/api/v1/licenses/{license_document.id}",
+        json={
+            "packages": [{"name": "BULK", "description": "Bulk package"}],
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["description"] == "License updated"
+    assert response_json["data"]["packages"][0]["name"] == "BULK"
+    assert response_json["data"]["is_active"] is False

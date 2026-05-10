@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.enums import CompanyType
 from app.models.company_model import AddressInfo, CorporationInfo, IdentityInfo
@@ -10,13 +10,21 @@ class CompanyBaseSchema(BaseModel):
     name: str
     short_name: str
     type: CompanyType
-    industries: str
-    sectors: str
+    industries: List[str] = Field(..., min_length=1, description="Company industries")
+    sectors: List[str] = Field(..., min_length=1, description="Company business sectors")
     owner: IdentityInfo
     address: AddressInfo
     corporation: Optional[CorporationInfo] = None
     self_sharing: Optional[float] = Field(default=None, ge=0)
     is_active: bool = True
+
+    @field_validator("industries", "sectors", mode="before")
+    @classmethod
+    def normalize_string_list(cls, value):
+        if isinstance(value, str):
+            values = [item.strip() for item in value.split(",") if item.strip()]
+            return values or [value]
+        return value
 
 
 class CreateCompanySchema(CompanyBaseSchema):
@@ -29,10 +37,18 @@ class UpdateCompanySchema(BaseModel):
     name: Optional[str] = None
     short_name: Optional[str] = None
     type: Optional[CompanyType] = None
-    industries: Optional[str] = None
-    sectors: Optional[str] = None
+    industries: Optional[List[str]] = None
+    sectors: Optional[List[str]] = None
     owner: Optional[IdentityInfo] = None
     address: Optional[AddressInfo] = None
     corporation: Optional[CorporationInfo] = None
     self_sharing: Optional[float] = Field(default=None, ge=0)
     is_active: Optional[bool] = None
+
+    @field_validator("industries", "sectors", mode="before")
+    @classmethod
+    def normalize_string_list(cls, value):
+        if isinstance(value, str):
+            values = [item.strip() for item in value.split(",") if item.strip()]
+            return values or [value]
+        return value

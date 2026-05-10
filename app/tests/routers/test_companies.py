@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.exceptions.AppException import AppException
 from app.models.company_model import Company
 from app.services.company_service import CompanyService
 from app.tests import database
@@ -45,6 +46,10 @@ def company_payload(**overrides):
     }
     payload.update(overrides)
     return payload
+
+
+async def noop_integration(*args, **kwargs):
+    return {"status_code": 200}
 
 
 async def initiate_database():
@@ -139,6 +144,24 @@ async def test_create_company(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_company_rolls_back_and_masks_integration_error(monkeypatch):
+    await initiate_database()
+
+    async def failing_create_company_admin(self, company, payload, temp_password):
+        raise AppException("User service request failed: Authentication required. Code: 4010")
+
+    monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
+
+    response = client.post("/api/v1/companies/", json=company_payload())
+
+    assert response.status_code == 502
+    response_json = response.json()
+    assert response_json["description"] == "Unable to complete company creation"
+    assert "User service" not in response_json["description"]
+    assert await Company.find_one({"name": "Test Company"}) is None
+
+
+@pytest.mark.asyncio
 async def test_create_company_duplicate():
     await initiate_database()
 
@@ -180,3 +203,26 @@ async def test_update_company():
     assert response_json["data"]["short_name"] == "UPDATED"
     assert response_json["data"]["type"] == "IMF"
     assert response_json["data"]["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_delete_company():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+
+    response = client.delete(f"/api/v1/companies/{company.id}")
+
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["description"] == "Company deleted"
+    assert await Company.get(company.id) is None
+
+
+def test_openapi_documents_industries_and_sectors_as_arrays():
+    openapi_schema = client.get("/openapi.json").json()
+    company_schema = openapi_schema["components"]["schemas"]["CreateCompanySchema"]
+
+    assert company_schema["properties"]["industries"]["type"] == "array"
+    assert company_schema["properties"]["sectors"]["type"] == "array"
