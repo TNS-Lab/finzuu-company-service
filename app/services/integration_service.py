@@ -14,6 +14,7 @@ class IntegrationService:
             raise AppException(f"{service_name} base url is not configured")
 
         url = urljoin(f"{base_url.rstrip('/')}/", path.lstrip("/"))
+        logger.info("Calling %s: POST %s", service_name, url)
 
         try:
             async with httpx.AsyncClient(timeout=settings.HTTP_CLIENT_TIMEOUT_SECONDS) as client:
@@ -21,6 +22,13 @@ class IntegrationService:
         except httpx.HTTPError as exc:
             logger.exception("Failed to call %s at %s", service_name, url)
             raise AppException(f"{service_name} is unreachable") from exc
+
+        logger.info(
+            "%s response: status=%s body=%s",
+            service_name,
+            response.status_code,
+            response.text[:1000],
+        )
 
         if response.status_code >= 400:
             try:
