@@ -22,6 +22,7 @@ def allow_permissions(monkeypatch):
 
         return Response()
 
+    monkeypatch.setattr(auth_permissions.settings, "AUTH_API", "http://auth-service.test")
     monkeypatch.setattr(auth_permissions.httpx.AsyncClient, "post", fake_post)
 
 

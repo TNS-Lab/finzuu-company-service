@@ -137,7 +137,7 @@ class CompanyService:
         auth_token: str | None = None,
     ) -> dict:
         if not settings.NOTIFICATION_SERVICE_BASE_URL:
-            logger.info("Notification service base url is not configured. Notification skipped for company %s", company.id)
+            logger.info("Company creation notification skipped for company %s", company.id)
             return {}
 
         notification_payload = {

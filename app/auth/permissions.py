@@ -2,6 +2,7 @@
 import httpx
 from fastapi import HTTPException, Request, status
 
+from app.configs import logger
 from app.configs.config import settings
 
 
@@ -38,13 +39,14 @@ def require_permissions(*permissions: str):
         if not auth_header:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required. Code: 4012",
+                detail="Authentication required",
             )
 
         if not settings.AUTH_API:
+            logger.error("Authentication service is not configured")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authentication service is not configured",
+                detail="Unable to process authentication",
             )
 
         payload = {
@@ -64,23 +66,26 @@ def require_permissions(*permissions: str):
                     headers=headers,
                 )
         except httpx.HTTPError as exc:
+            logger.exception("Authentication service is unreachable")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication service is unreachable",
+                detail="Unable to process authentication",
             ) from exc
 
         if response.status_code in (status.HTTP_200_OK, status.HTTP_202_ACCEPTED):
             return True
 
         if response.status_code == status.HTTP_401_UNAUTHORIZED:
+            logger.warning("Authentication rejected by auth service with status %s", response.status_code)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required. Code: 4013",
+                detail="Authentication required",
             )
 
+        logger.warning("Permission denied by auth service with status %s", response.status_code)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this route or insufficient permissions.",
+            detail="Access denied",
         )
 
     return permission_checker

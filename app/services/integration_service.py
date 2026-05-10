@@ -8,6 +8,10 @@ from app.configs.config import settings
 from app.exceptions.AppException import AppException
 
 
+def public_service_error() -> str:
+    return "Unable to complete request"
+
+
 class IntegrationService:
     async def post(
         self,
@@ -18,7 +22,8 @@ class IntegrationService:
         auth_token: str | None = None,
     ) -> dict[str, Any]:
         if not base_url:
-            raise AppException(f"{service_name} base url is not configured")
+            logger.error("%s base url is not configured", service_name)
+            raise AppException(public_service_error())
 
         url = urljoin(f"{base_url.rstrip('/')}/", path.lstrip("/"))
         logger.info("Calling %s: POST %s", service_name, url)
@@ -31,13 +36,12 @@ class IntegrationService:
                 response = await client.post(url, json=payload, headers=headers)
         except httpx.HTTPError as exc:
             logger.exception("Failed to call %s at %s", service_name, url)
-            raise AppException(f"{service_name} is unreachable") from exc
+            raise AppException(public_service_error()) from exc
 
         logger.info(
-            "%s response: status=%s body=%s",
+            "%s response: status=%s",
             service_name,
             response.status_code,
-            response.text[:1000],
         )
 
         if response.status_code >= 400:
@@ -48,7 +52,7 @@ class IntegrationService:
 
             description = response_payload.get("description") or response.text or f"{service_name} request failed"
             logger.error("%s returned %s for %s: %s", service_name, response.status_code, url, description)
-            raise AppException(f"{service_name} request failed: {description}")
+            raise AppException(public_service_error())
 
         try:
             return response.json()

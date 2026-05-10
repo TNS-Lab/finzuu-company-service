@@ -21,6 +21,7 @@ def allow_permissions(monkeypatch):
 
         return Response()
 
+    monkeypatch.setattr(auth_permissions.settings, "AUTH_API", "http://auth-service.test")
     monkeypatch.setattr(auth_permissions.httpx.AsyncClient, "post", fake_post)
 
 
@@ -274,3 +275,47 @@ def test_openapi_documents_industries_and_sectors_as_arrays():
 
     assert company_schema["properties"]["industries"]["type"] == "array"
     assert company_schema["properties"]["sectors"]["type"] == "array"
+
+
+def test_company_endpoint_without_token_returns_generic_auth_error():
+    response = client.get("/api/v1/companies/")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_company_endpoint_with_rejected_token_returns_generic_auth_error(monkeypatch):
+    async def fake_post(*args, **kwargs):
+        class Response:
+            status_code = 401
+
+        return Response()
+
+    monkeypatch.setattr(auth_permissions.settings, "AUTH_API", "http://auth-service.test")
+    monkeypatch.setattr(auth_permissions.httpx.AsyncClient, "post", fake_post)
+
+    response = client.get("/api/v1/companies/", headers=AUTH_HEADERS)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_request_logs_mask_sensitive_headers_and_body(caplog):
+    response = client.post(
+        "/api/v1/companies/",
+        json={
+            "access_token": "secret-access-token",
+            "password": "secret-password",
+        },
+        headers={
+            "Authorization": "Bearer secret-token",
+            "Cookie": "access_token=secret-cookie",
+        },
+    )
+
+    assert response.status_code in (400, 422)
+    log_output = caplog.text
+    assert "secret-token" not in log_output
+    assert "secret-cookie" not in log_output
+    assert "secret-access-token" not in log_output
+    assert "secret-password" not in log_output
