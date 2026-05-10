@@ -7,17 +7,17 @@ from app.enums import PackageName
 
 
 class PackageSchema(BaseModel):
-    name: PackageName
-    description: str
+    name: PackageName = Field(..., description="Package activé par la licence.")
+    description: str = Field(..., description="Description lisible du package.", examples=["Accès aux fonctionnalités Ready Cash"])
 
 
 class CreateLicenseSchema(BaseModel):
-    company_id: str
-    packages: List[PackageSchema]
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    duration_days: Optional[int] = Field(default=None, gt=0)
-    is_active: bool = True
+    company_id: str = Field(..., description="Identifiant de la compagnie bénéficiaire de la licence.")
+    packages: List[PackageSchema] = Field(..., min_length=1, description="Liste des packages activés pour la compagnie.")
+    start_date: Optional[datetime] = Field(default=None, description="Date de début de la licence. Si elle est absente, la date de création est utilisée.")
+    end_date: Optional[datetime] = Field(default=None, description="Date de fin de la licence. Elle doit être supérieure à start_date si elle est renseignée.")
+    duration_days: Optional[int] = Field(default=None, gt=0, description="Durée de la licence en jours lorsque end_date n'est pas fournie.", examples=[365])
+    is_active: bool = Field(default=True, description="Indique si la licence est active.")
 
     @model_validator(mode="after")
     def validate_dates(self) -> "CreateLicenseSchema":
@@ -27,11 +27,11 @@ class CreateLicenseSchema(BaseModel):
 
 
 class UpdateLicenseSchema(BaseModel):
-    packages: Optional[List[PackageSchema]] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    duration_days: Optional[int] = Field(default=None, gt=0)
-    is_active: Optional[bool] = None
+    packages: Optional[List[PackageSchema]] = Field(default=None, description="Nouvelle liste des packages activés pour la compagnie.")
+    start_date: Optional[datetime] = Field(default=None, description="Nouvelle date de début de la licence.")
+    end_date: Optional[datetime] = Field(default=None, description="Nouvelle date de fin de la licence. Elle doit être supérieure à start_date si elle est renseignée.")
+    duration_days: Optional[int] = Field(default=None, gt=0, description="Nouvelle durée de la licence en jours.", examples=[365])
+    is_active: Optional[bool] = Field(default=None, description="Nouveau statut d'activation de la licence.")
 
     @model_validator(mode="after")
     def validate_dates(self) -> "UpdateLicenseSchema":
