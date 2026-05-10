@@ -30,3 +30,34 @@ async def test_integration_service_maps_user_duplicate_to_bad_request(monkeypatc
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.message == "Company admin user already exists"
+
+
+@pytest.mark.asyncio
+async def test_integration_service_adds_internal_headers_for_account_service(monkeypatch):
+    captured_headers = {}
+
+    class SuccessResponse:
+        status_code = 201
+
+        def json(self):
+            return {"status_code": 201}
+
+    async def fake_post(self, *args, **kwargs):
+        nonlocal captured_headers
+        captured_headers = kwargs["headers"]
+        return SuccessResponse()
+
+    monkeypatch.setattr("app.services.integration_service.settings.INTERNAL_SERVICE_TOKEN", "internal-secret")
+    monkeypatch.setattr("app.services.integration_service.httpx.AsyncClient.post", fake_post)
+
+    await IntegrationService().post(
+        base_url="http://account-service.test",
+        path="/api/v1/accounts/",
+        payload={},
+        service_name="Account service",
+        auth_token="user-token",
+    )
+
+    assert captured_headers["Authorization"] == "Bearer user-token"
+    assert captured_headers["X-Internal-Service-Name"] == "company-service"
+    assert captured_headers["X-Internal-Service-Token"] == "internal-secret"

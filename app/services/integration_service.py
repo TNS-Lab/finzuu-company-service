@@ -45,6 +45,9 @@ class IntegrationService:
         headers = {}
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
+        if service_name == "Account service" and settings.INTERNAL_SERVICE_TOKEN:
+            headers["X-Internal-Service-Name"] = "company-service"
+            headers["X-Internal-Service-Token"] = settings.INTERNAL_SERVICE_TOKEN
 
         try:
             async with httpx.AsyncClient(timeout=settings.HTTP_CLIENT_TIMEOUT_SECONDS) as client:
