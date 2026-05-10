@@ -12,6 +12,21 @@ def public_service_error() -> str:
     return "Unable to complete request"
 
 
+def client_error_message(service_name: str, description: str) -> str:
+    lowered_description = description.lower()
+
+    if service_name == "User service" and "already exist" in lowered_description:
+        return "Company admin user already exists"
+
+    if service_name == "User service":
+        return "Unable to create company admin user"
+
+    if service_name == "Account service":
+        return "Unable to create company operation account"
+
+    return public_service_error()
+
+
 class IntegrationService:
     async def post(
         self,
@@ -52,6 +67,12 @@ class IntegrationService:
 
             description = response_payload.get("description") or response.text or f"{service_name} request failed"
             logger.error("%s returned %s for %s: %s", service_name, response.status_code, url, description)
+            if 400 <= response.status_code < 500:
+                raise AppException(
+                    client_error_message(service_name, description),
+                    status_code=response.status_code,
+                )
+
             raise AppException(public_service_error())
 
         try:

@@ -210,6 +210,25 @@ async def test_create_company_rolls_back_and_masks_integration_error(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_create_company_returns_bad_request_when_company_admin_already_exists(monkeypatch):
+    await initiate_database()
+
+    async def failing_create_company_admin(self, company, payload, temp_password, auth_token=None):
+        raise AppException("Company admin user already exists", status_code=400)
+
+    monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
+
+    response = client.post("/api/v1/companies/", json=company_payload(), headers=AUTH_HEADERS)
+
+    assert response.status_code == 400
+    response_json = response.json()
+    assert response_json["status_code"] == 400
+    assert response_json["response_type"] == "Bad Request"
+    assert response_json["description"] == "Company admin user already exists"
+    assert await Company.find_one({"name": "Test Company"}) is None
+
+
+@pytest.mark.asyncio
 async def test_create_company_duplicate():
     await initiate_database()
 

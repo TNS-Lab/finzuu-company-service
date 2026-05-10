@@ -74,11 +74,11 @@ async def create_company(payload: CreateCompanySchema, request: Request, respons
         new_company = await CompanyService().create(payload, auth_token=get_bearer_token(request))
     except AppException as exc:
         logger.error("Company creation failed during inter-service orchestration: %s", exc.message)
-        response.status_code = status.HTTP_502_BAD_GATEWAY
+        response.status_code = exc.status_code
         return {
-            "status_code": status.HTTP_502_BAD_GATEWAY,
-            "response_type": "Integration Error",
-            "description": "Unable to complete company creation",
+            "status_code": exc.status_code,
+            "response_type": "Bad Request" if exc.status_code < 500 else "Integration Error",
+            "description": exc.message if exc.status_code < 500 else "Unable to complete company creation",
             "data": "",
         }
 
