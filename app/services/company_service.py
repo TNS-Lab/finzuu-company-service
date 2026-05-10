@@ -30,7 +30,7 @@ class CompanyService:
             }
         )
 
-    async def create(self, payload: CreateCompanySchema) -> Company:
+    async def create(self, payload: CreateCompanySchema, auth_token: str | None = None) -> Company:
         company = Company(
             name=payload.name,
             short_name=payload.short_name,
@@ -47,9 +47,9 @@ class CompanyService:
 
         temp_password = generate_key(12)
         try:
-            await self._create_company_admin(company, payload, temp_password)
-            await self._create_company_operation_account(company)
-            await self._send_company_creation_notification(company, payload, temp_password)
+            await self._create_company_admin(company, payload, temp_password, auth_token)
+            await self._create_company_operation_account(company, auth_token)
+            await self._send_company_creation_notification(company, payload, temp_password, auth_token)
         except Exception:
             await company.delete()
             raise
@@ -80,7 +80,7 @@ class CompanyService:
         await company.delete()
         return True
 
-    async def _create_company_admin(self, company: Company, payload: CreateCompanySchema, temp_password: str) -> dict:
+    async def _create_company_admin(self, company: Company, payload: CreateCompanySchema, temp_password: str, auth_token: str | None = None) -> dict:
         admin_username = self._build_admin_username(payload.admin_first_name, payload.admin_last_name)
 
         user_payload = {
@@ -98,9 +98,10 @@ class CompanyService:
             path=settings.USER_SERVICE_CREATE_USER_PATH,
             payload=user_payload,
             service_name="User service",
+            auth_token=auth_token,
         )
 
-    async def _create_company_operation_account(self, company: Company) -> dict:
+    async def _create_company_operation_account(self, company: Company, auth_token: str | None = None) -> dict:
         account_payload = {
             "label": f"{company.short_name} OPERATION",
             "currency": "XAF",
@@ -125,6 +126,7 @@ class CompanyService:
             path=settings.ACCOUNT_SERVICE_CREATE_ACCOUNT_PATH,
             payload=account_payload,
             service_name="Account service",
+            auth_token=auth_token,
         )
 
     async def _send_company_creation_notification(
@@ -132,6 +134,7 @@ class CompanyService:
         company: Company,
         payload: CreateCompanySchema,
         temp_password: str,
+        auth_token: str | None = None,
     ) -> dict:
         if not settings.NOTIFICATION_SERVICE_BASE_URL:
             logger.info("Notification service base url is not configured. Notification skipped for company %s", company.id)
@@ -157,6 +160,7 @@ class CompanyService:
                 path=settings.NOTIFICATION_SERVICE_SEND_EMAIL_PATH,
                 payload=notification_payload,
                 service_name="Notification service",
+                auth_token=auth_token,
             )
         except AppException as exc:
             logger.warning("Company %s created but notification failed: %s", company.id, exc.message)

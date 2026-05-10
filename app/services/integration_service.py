@@ -9,16 +9,26 @@ from app.exceptions.AppException import AppException
 
 
 class IntegrationService:
-    async def post(self, base_url: str, path: str, payload: dict[str, Any], service_name: str) -> dict[str, Any]:
+    async def post(
+        self,
+        base_url: str,
+        path: str,
+        payload: dict[str, Any],
+        service_name: str,
+        auth_token: str | None = None,
+    ) -> dict[str, Any]:
         if not base_url:
             raise AppException(f"{service_name} base url is not configured")
 
         url = urljoin(f"{base_url.rstrip('/')}/", path.lstrip("/"))
         logger.info("Calling %s: POST %s", service_name, url)
+        headers = {}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
 
         try:
             async with httpx.AsyncClient(timeout=settings.HTTP_CLIENT_TIMEOUT_SECONDS) as client:
-                response = await client.post(url, json=payload)
+                response = await client.post(url, json=payload, headers=headers)
         except httpx.HTTPError as exc:
             logger.exception("Failed to call %s at %s", service_name, url)
             raise AppException(f"{service_name} is unreachable") from exc

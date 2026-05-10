@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.auth.permissions import require_permissions
 from app.configs import logger
@@ -12,6 +12,14 @@ from app.utils.pagination import get_skip_value, pagination
 from app.utils.serialization import serialize_model, serialize_models
 
 router = APIRouter()
+
+
+def get_bearer_token(request: Request) -> str | None:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.split(" ", 1)[1]
+
+    return request.cookies.get("access_token")
 
 
 @router.get("/", status_code=status.HTTP_200_OK, response_model=ApiPaginateResponse)
@@ -51,7 +59,7 @@ async def get(company_id: str, response: Response, __=Depends(require_permission
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ApiResponse)
-async def create_company(payload: CreateCompanySchema, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_CREATE))):
+async def create_company(payload: CreateCompanySchema, request: Request, response: Response, __=Depends(require_permissions(Permission.COMPANY_COMPANY_CREATE))):
     existing_company = await CompanyService().get_by_name_or_short_name(payload.name, payload.short_name)
     if existing_company:
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -63,7 +71,7 @@ async def create_company(payload: CreateCompanySchema, response: Response, __=De
         }
 
     try:
-        new_company = await CompanyService().create(payload)
+        new_company = await CompanyService().create(payload, auth_token=get_bearer_token(request))
     except AppException as exc:
         logger.error("Company creation failed during inter-service orchestration: %s", exc.message)
         response.status_code = status.HTTP_502_BAD_GATEWAY

@@ -115,13 +115,13 @@ async def test_get_company_not_found():
 async def test_create_company(monkeypatch):
     await initiate_database()
 
-    async def fake_create_company_admin(self, company, payload, temp_password):
+    async def fake_create_company_admin(self, company, payload, temp_password, auth_token=None):
         return {"status_code": 201}
 
-    async def fake_create_company_operation_account(self, company):
+    async def fake_create_company_operation_account(self, company, auth_token=None):
         return {"status_code": 201}
 
-    async def fake_send_company_creation_notification(self, company, payload, temp_password):
+    async def fake_send_company_creation_notification(self, company, payload, temp_password, auth_token=None):
         return {"status_code": 200}
 
     monkeypatch.setattr(CompanyService, "_create_company_admin", fake_create_company_admin)
@@ -144,10 +144,44 @@ async def test_create_company(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_company_forwards_bearer_token(monkeypatch):
+    await initiate_database()
+    captured_auth_token = None
+
+    async def fake_create_company_admin(self, company, payload, temp_password, auth_token=None):
+        nonlocal captured_auth_token
+        captured_auth_token = auth_token
+        return {"status_code": 201}
+
+    async def fake_create_company_operation_account(self, company, auth_token=None):
+        return {"status_code": 201}
+
+    async def fake_send_company_creation_notification(self, company, payload, temp_password, auth_token=None):
+        return {"status_code": 200}
+
+    monkeypatch.setattr(CompanyService, "_create_company_admin", fake_create_company_admin)
+    monkeypatch.setattr(CompanyService, "_create_company_operation_account", fake_create_company_operation_account)
+    monkeypatch.setattr(
+        CompanyService,
+        "_send_company_creation_notification",
+        fake_send_company_creation_notification,
+    )
+
+    response = client.post(
+        "/api/v1/companies/",
+        json=company_payload(),
+        headers={"Authorization": "Bearer token-123"},
+    )
+
+    assert response.status_code == 201
+    assert captured_auth_token == "token-123"
+
+
+@pytest.mark.asyncio
 async def test_create_company_rolls_back_and_masks_integration_error(monkeypatch):
     await initiate_database()
 
-    async def failing_create_company_admin(self, company, payload, temp_password):
+    async def failing_create_company_admin(self, company, payload, temp_password, auth_token=None):
         raise AppException("User service request failed: Authentication required. Code: 4010")
 
     monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
