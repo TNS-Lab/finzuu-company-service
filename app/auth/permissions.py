@@ -31,9 +31,6 @@ def get_auth_header(request: Request) -> str | None:
 
 def require_permissions(*permissions: str):
     async def permission_checker(request: Request):
-        if settings.APP_ENV.upper() == "TEST":
-            return True
-
         if request.url.path in PUBLIC_PATHS:
             return True
 

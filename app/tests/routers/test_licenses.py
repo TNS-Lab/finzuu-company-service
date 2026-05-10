@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+import app.auth.permissions as auth_permissions
 from app.main import app
 from app.models.company_model import Company
 from app.models.license_model import CompanySnapshot, License, PackageInfo
@@ -10,6 +11,18 @@ from app.tests import database
 
 
 client = TestClient(app)
+AUTH_HEADERS = {"Authorization": "Bearer test-token"}
+
+
+@pytest.fixture(autouse=True)
+def allow_permissions(monkeypatch):
+    async def fake_post(*args, **kwargs):
+        class Response:
+            status_code = 202
+
+        return Response()
+
+    monkeypatch.setattr(auth_permissions.httpx.AsyncClient, "post", fake_post)
 
 
 def company_payload(**overrides):
@@ -72,7 +85,7 @@ async def test_get_all_licenses():
     )
     await license_document.insert()
 
-    response = client.get("/api/v1/licenses/")
+    response = client.get("/api/v1/licenses/", headers=AUTH_HEADERS)
 
     assert response.status_code == 200
     response_json = response.json()
@@ -88,7 +101,7 @@ async def test_get_all_licenses():
 async def test_get_license_not_found():
     await initiate_database()
 
-    response = client.get("/api/v1/licenses/unknown_id")
+    response = client.get("/api/v1/licenses/unknown_id", headers=AUTH_HEADERS)
 
     assert response.status_code == 404
     response_json = response.json()
@@ -105,7 +118,7 @@ async def test_create_license():
     company = Company(**company_payload())
     await company.insert()
 
-    response = client.post("/api/v1/licenses/", json=license_payload(company))
+    response = client.post("/api/v1/licenses/", json=license_payload(company), headers=AUTH_HEADERS)
 
     assert response.status_code == 201
     response_json = response.json()
@@ -128,6 +141,7 @@ async def test_create_license_company_not_found():
             "packages": [{"name": "READY_CASH", "description": "Ready Cash package"}],
             "duration_days": 30,
         },
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 404
@@ -152,7 +166,7 @@ async def test_get_licenses_by_company():
     )
     await license_document.insert()
 
-    response = client.get(f"/api/v1/licenses/company/{company.id}")
+    response = client.get(f"/api/v1/licenses/company/{company.id}", headers=AUTH_HEADERS)
 
     assert response.status_code == 200
     response_json = response.json()
@@ -184,6 +198,7 @@ async def test_update_license():
             "packages": [{"name": "BULK", "description": "Bulk package"}],
             "is_active": False,
         },
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200

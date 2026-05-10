@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+import app.auth.permissions as auth_permissions
 from app.main import app
 from app.exceptions.AppException import AppException
 from app.models.company_model import Company
@@ -9,6 +10,18 @@ from app.tests import database
 
 
 client = TestClient(app)
+AUTH_HEADERS = {"Authorization": "Bearer test-token"}
+
+
+@pytest.fixture(autouse=True)
+def allow_permissions(monkeypatch):
+    async def fake_post(*args, **kwargs):
+        class Response:
+            status_code = 202
+
+        return Response()
+
+    monkeypatch.setattr(auth_permissions.httpx.AsyncClient, "post", fake_post)
 
 
 def company_payload(**overrides):
@@ -66,7 +79,7 @@ async def test_get_all_companies():
     ]
     await Company.insert_many(companies)
 
-    response = client.get("/api/v1/companies/")
+    response = client.get("/api/v1/companies/", headers=AUTH_HEADERS)
 
     assert response.status_code == 200
     response_json = response.json()
@@ -86,7 +99,7 @@ async def test_get_company():
     company = Company(**company_payload())
     await company.insert()
 
-    response = client.get(f"/api/v1/companies/{company.id}")
+    response = client.get(f"/api/v1/companies/{company.id}", headers=AUTH_HEADERS)
 
     assert response.status_code == 200
     response_json = response.json()
@@ -101,7 +114,7 @@ async def test_get_company():
 async def test_get_company_not_found():
     await initiate_database()
 
-    response = client.get("/api/v1/companies/unknown_id")
+    response = client.get("/api/v1/companies/unknown_id", headers=AUTH_HEADERS)
 
     assert response.status_code == 404
     response_json = response.json()
@@ -132,7 +145,7 @@ async def test_create_company(monkeypatch):
         fake_send_company_creation_notification,
     )
 
-    response = client.post("/api/v1/companies/", json=company_payload())
+    response = client.post("/api/v1/companies/", json=company_payload(), headers=AUTH_HEADERS)
 
     assert response.status_code == 201
     response_json = response.json()
@@ -186,7 +199,7 @@ async def test_create_company_rolls_back_and_masks_integration_error(monkeypatch
 
     monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
 
-    response = client.post("/api/v1/companies/", json=company_payload())
+    response = client.post("/api/v1/companies/", json=company_payload(), headers=AUTH_HEADERS)
 
     assert response.status_code == 502
     response_json = response.json()
@@ -202,7 +215,7 @@ async def test_create_company_duplicate():
     company = Company(**company_payload())
     await company.insert()
 
-    response = client.post("/api/v1/companies/", json=company_payload())
+    response = client.post("/api/v1/companies/", json=company_payload(), headers=AUTH_HEADERS)
 
     assert response.status_code == 400
     response_json = response.json()
@@ -226,6 +239,7 @@ async def test_update_company():
             "type": "IMF",
             "is_active": False,
         },
+        headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
@@ -246,7 +260,7 @@ async def test_delete_company():
     company = Company(**company_payload())
     await company.insert()
 
-    response = client.delete(f"/api/v1/companies/{company.id}")
+    response = client.delete(f"/api/v1/companies/{company.id}", headers=AUTH_HEADERS)
 
     assert response.status_code == 200
     response_json = response.json()
