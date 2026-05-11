@@ -1,8 +1,9 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
-from fastapi_utils.tasks import repeat_every
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from contextlib import asynccontextmanager
 
 from .api import api_router
 from app.configs import database, logger
@@ -11,11 +12,39 @@ from app.middlewares.log_middleware import log_middleware
 from app.services.license_service import LicenseService
 
 
+LICENSE_EXPIRATION_INTERVAL_SECONDS = 60 * 60 * 3
+
+
+async def expire_licenses_once() -> None:
+    expired_count = await LicenseService().expire_licenses()
+    if expired_count:
+        logger.info("Expired %s license(s)", expired_count)
+
+
+async def expire_licenses_repeated(stop_event: asyncio.Event) -> None:
+    while not stop_event.is_set():
+        try:
+            await expire_licenses_once()
+        except Exception:
+            logger.exception("Unable to expire outdated licenses")
+
+        with suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(stop_event.wait(), timeout=LICENSE_EXPIRATION_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.initiate_database()
+    stop_event = asyncio.Event()
+    license_task = asyncio.create_task(expire_licenses_repeated(stop_event))
     
-    yield
+    try:
+        yield
+    finally:
+        stop_event.set()
+        license_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await license_task
 
 
 app = FastAPI(
@@ -37,10 +66,5 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
 
 app.include_router(api_router)
 
-
-@app.on_event("startup")
-@repeat_every(seconds=60 * 60 * 12, raise_exceptions=False)
-async def expire_licenses_task() -> None:
-    expired_count = await LicenseService().expire_licenses()
 
 logger.info('Starting API ...')

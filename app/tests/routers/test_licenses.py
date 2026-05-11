@@ -5,8 +5,10 @@ from fastapi.testclient import TestClient
 
 import app.auth.permissions as auth_permissions
 from app.main import app
+from app.main import LICENSE_EXPIRATION_INTERVAL_SECONDS
 from app.models.company_model import Company
 from app.models.license_model import CompanySnapshot, License, PackageInfo
+from app.services.license_service import LicenseService
 from app.tests import database
 
 
@@ -153,6 +155,47 @@ async def test_create_license_company_not_found():
 
 
 @pytest.mark.asyncio
+async def test_create_license_rejects_invalid_dates():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+    payload = license_payload(company)
+    payload.update(
+        {
+            "start_date": "2026-06-01T00:00:00Z",
+            "end_date": "2026-05-01T00:00:00Z",
+        }
+    )
+    payload.pop("duration_days")
+
+    response = client.post("/api/v1/licenses/", json=payload, headers=AUTH_HEADERS)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_license_rejects_expired_active_license():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+    payload = license_payload(company)
+    payload.update(
+        {
+            "start_date": "2026-05-01T00:00:00Z",
+            "end_date": "2026-05-02T00:00:00Z",
+        }
+    )
+    payload.pop("duration_days")
+
+    response = client.post("/api/v1/licenses/", json=payload, headers=AUTH_HEADERS)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "end_date must be in the future for an active license"
+
+
+@pytest.mark.asyncio
 async def test_get_licenses_by_company():
     await initiate_database()
 
@@ -207,3 +250,54 @@ async def test_update_license():
     assert response_json["description"] == "License updated"
     assert response_json["data"]["packages"][0]["name"] == "BULK"
     assert response_json["data"]["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_update_license_rejects_invalid_final_dates():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+    license_document = License(
+        start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
+        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        is_active=True,
+    )
+    await license_document.insert()
+
+    response = client.put(
+        f"/api/v1/licenses/{license_document.id}",
+        json={"start_date": "2026-07-01T00:00:00Z"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "end_date must be greater than start_date"
+
+
+@pytest.mark.asyncio
+async def test_expire_licenses_deactivates_outdated_active_licenses():
+    await initiate_database()
+
+    company = Company(**company_payload())
+    await company.insert()
+    expired_license = License(
+        start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        end_date=datetime(2026, 5, 2, tzinfo=timezone.utc),
+        company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
+        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        is_active=True,
+    )
+    await expired_license.insert()
+
+    expired_count = await LicenseService().expire_licenses()
+    refreshed_license = await License.get(expired_license.id)
+
+    assert expired_count == 1
+    assert refreshed_license.is_active is False
+
+
+def test_license_expiration_task_runs_every_three_hours():
+    assert LICENSE_EXPIRATION_INTERVAL_SECONDS == 60 * 60 * 3

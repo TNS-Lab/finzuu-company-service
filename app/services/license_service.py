@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from fastapi import HTTPException, status
+
 from app.configs.config import settings
 from app.models.company_model import Company
 from app.models.license_model import CompanySnapshot, License, PackageInfo
@@ -9,6 +11,25 @@ from app.utils.date import add_days, has_expired
 
 
 class LicenseService:
+    def _as_utc(self, value: datetime) -> datetime:
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    def _validate_dates(self, start_date: datetime, end_date: datetime, is_active: bool) -> None:
+        start_date = self._as_utc(start_date)
+        end_date = self._as_utc(end_date)
+
+        if end_date <= start_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="end_date must be greater than start_date",
+            )
+
+        if is_active and end_date <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="end_date must be in the future for an active license",
+            )
+
     async def get_all(self, skip: int, limit: int) -> List[License]:
         return await License.find_all().skip(skip).limit(limit).to_list()
 
@@ -51,6 +72,7 @@ class LicenseService:
 
         start_date = payload.start_date or datetime.now(timezone.utc)
         end_date = payload.end_date or add_days(start_date, payload.duration_days or settings.DEFAULT_LICENSE_DURATION_DAYS)
+        self._validate_dates(start_date, end_date, payload.is_active)
 
         license_document = License(
             start_date=start_date,
@@ -85,6 +107,11 @@ class LicenseService:
 
         if "packages" in update_data:
             update_data["packages"] = [PackageInfo(**package) for package in update_data["packages"]]
+
+        next_start_date = update_data.get("start_date", license_document.start_date)
+        next_end_date = update_data.get("end_date", license_document.end_date)
+        next_is_active = update_data.get("is_active", license_document.is_active)
+        self._validate_dates(next_start_date, next_end_date, next_is_active)
 
         for field, value in update_data.items():
             setattr(license_document, field, value)
