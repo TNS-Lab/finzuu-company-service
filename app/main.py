@@ -1,18 +1,17 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .api import api_router
 from app.configs import database, logger
 from app.configs.config import settings
+from app.exceptions.handlers import http_exception_handler
 from app.middlewares.log_middleware import log_middleware
 from app.services.license_service import LicenseService
-
-
-LICENSE_EXPIRATION_INTERVAL_SECONDS = 60 * 60 * 3
 
 
 async def expire_licenses_once() -> None:
@@ -29,7 +28,7 @@ async def expire_licenses_repeated(stop_event: asyncio.Event) -> None:
             logger.exception("Unable to expire outdated licenses")
 
         with suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(stop_event.wait(), timeout=LICENSE_EXPIRATION_INTERVAL_SECONDS)
+            await asyncio.wait_for(stop_event.wait(), timeout=settings.LICENSE_EXPIRATION_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
@@ -64,7 +63,37 @@ app.add_middleware(
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
 
+app.add_exception_handler(HTTPException, http_exception_handler)
+
 app.include_router(api_router)
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="Company Service",
+        version="1.0.1",
+        description="API avec authentification JWT",
+        routes=app.routes,
+    )
+
+    openapi_schema.setdefault("components", {})
+    openapi_schema["components"].setdefault("securitySchemes", {})
+    openapi_schema["components"]["securitySchemes"]["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entrez votre token JWT",
+    }
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 logger.info('Starting API ...')

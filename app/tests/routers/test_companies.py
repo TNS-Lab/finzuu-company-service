@@ -279,13 +279,25 @@ def test_openapi_documents_industries_and_sectors_as_arrays():
 
     assert company_schema["properties"]["industries"]["type"] == "array"
     assert company_schema["properties"]["sectors"]["type"] == "array"
+    assert openapi_schema["components"]["securitySchemes"]["BearerAuth"] == {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entrez votre token JWT",
+    }
+    assert openapi_schema["security"] == [{"BearerAuth": []}]
 
 
 def test_company_endpoint_without_token_returns_generic_auth_error():
     response = client.get("/api/v1/companies/")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Authentication required"
+    assert response.json() == {
+        "status_code": 401,
+        "response_type": "Unauthorized",
+        "description": "Authentication required",
+        "data": None,
+    }
 
 
 def test_company_endpoint_with_rejected_token_returns_generic_auth_error(monkeypatch):
@@ -301,7 +313,12 @@ def test_company_endpoint_with_rejected_token_returns_generic_auth_error(monkeyp
     response = client.get("/api/v1/companies/", headers=AUTH_HEADERS)
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Authentication required"
+    assert response.json() == {
+        "status_code": 401,
+        "response_type": "Unauthorized",
+        "description": "Authentication required",
+        "data": None,
+    }
 
 
 def test_request_logs_mask_sensitive_headers_and_body(caplog):

@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.auth.permissions as auth_permissions
+from app.configs.config import settings
 from app.main import app
-from app.main import LICENSE_EXPIRATION_INTERVAL_SECONDS
 from app.models.company_model import Company
 from app.models.license_model import CompanySnapshot, License, PackageInfo
 from app.services.license_service import LicenseService
@@ -192,7 +192,12 @@ async def test_create_license_rejects_expired_active_license():
     response = client.post("/api/v1/licenses/", json=payload, headers=AUTH_HEADERS)
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "end_date must be in the future for an active license"
+    assert response.json() == {
+        "status_code": 400,
+        "response_type": "Bad Request",
+        "description": "end_date must be in the future for an active license",
+        "data": None,
+    }
 
 
 @pytest.mark.asyncio
@@ -274,7 +279,12 @@ async def test_update_license_rejects_invalid_final_dates():
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "end_date must be greater than start_date"
+    assert response.json() == {
+        "status_code": 400,
+        "response_type": "Bad Request",
+        "description": "end_date must be greater than start_date",
+        "data": None,
+    }
 
 
 @pytest.mark.asyncio
@@ -300,4 +310,4 @@ async def test_expire_licenses_deactivates_outdated_active_licenses():
 
 
 def test_license_expiration_task_runs_every_three_hours():
-    assert LICENSE_EXPIRATION_INTERVAL_SECONDS == 60 * 60 * 3
+    assert settings.LICENSE_EXPIRATION_INTERVAL_SECONDS == 60 * 60 * 3

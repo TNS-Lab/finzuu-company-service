@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     DB_CONNECTION: str
 
     DEFAULT_LICENSE_DURATION_DAYS: int = 365
+    LICENSE_EXPIRATION_INTERVAL_SECONDS: int = 60 * 60 * 3
     HTTP_CLIENT_TIMEOUT_SECONDS: int = 15
 
     AUTH_API: str = ""
