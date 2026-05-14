@@ -10,6 +10,7 @@ from .api import api_router
 from app.configs import database, logger
 from app.configs.config import settings
 from app.exceptions.handlers import http_exception_handler
+from app.middlewares.auth_middleware import AuthMiddleware
 from app.middlewares.log_middleware import log_middleware
 from app.services.license_service import LicenseService
 
@@ -61,6 +62,7 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+app.add_middleware(AuthMiddleware)
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
 
 app.add_exception_handler(HTTPException, http_exception_handler)
