@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 import app.auth.permissions as auth_permissions
 from app.main import app
-from app.exceptions.AppException import AppException
+from app.exceptions.custom_exceptions import BadRequestException, IntegrationException
 from app.models.company_model import Company
 from app.services.company_service import CompanyService
 from app.tests import database
@@ -122,7 +122,7 @@ async def test_get_company_not_found():
     assert response_json["status_code"] == 404
     assert response_json["response_type"] == "Not Found"
     assert response_json["description"] == "Company not found"
-    assert response_json["data"] == ""
+    assert response_json["data"] is None
 
 
 @pytest.mark.asyncio
@@ -192,11 +192,49 @@ async def test_create_company_forwards_bearer_token(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_company_operation_account_payload_matches_account_service_schema(monkeypatch):
+    company = Company(**company_payload())
+    captured_request = {}
+
+    async def fake_post(**kwargs):
+        nonlocal captured_request
+        captured_request = kwargs
+        return {"status_code": 201}
+
+    service = CompanyService()
+    monkeypatch.setattr(service.integration_service, "post", fake_post)
+    monkeypatch.setattr("app.services.company_service.settings.ACCOUNT_SERVICE_BASE_URL", "http://account-service.test")
+
+    await service._create_company_operation_account(company, auth_token="token-123")
+
+    assert captured_request["path"] == "/api/v1/accounts"
+    assert captured_request["service_name"] == "Account service"
+    assert captured_request["auth_token"] == "token-123"
+    assert captured_request["payload"] == {
+        "currency": "XAF",
+        "type": "OPERATION",
+        "external_id": company.id,
+        "external_class": "COMPANY",
+        "owner_type": "company",
+        "owner_identity": {
+            "id": company.id,
+            "name": company.name,
+            "short_name": company.short_name,
+            "type": company.type,
+        },
+        "direct_momo": False,
+        "status": "ACTIVE",
+    }
+    assert "label" not in captured_request["payload"]
+    assert "account_number" not in captured_request["payload"]
+
+
+@pytest.mark.asyncio
 async def test_create_company_rolls_back_and_masks_integration_error(monkeypatch):
     await initiate_database()
 
     async def failing_create_company_admin(self, company, payload, temp_password, auth_token=None):
-        raise AppException("User service request failed: Authentication required. Code: 4010")
+        raise IntegrationException("User service request failed: Authentication required. Code: 4010")
 
     monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
 
@@ -214,7 +252,7 @@ async def test_create_company_returns_bad_request_when_company_admin_already_exi
     await initiate_database()
 
     async def failing_create_company_admin(self, company, payload, temp_password, auth_token=None):
-        raise AppException("Company admin user already exists", status_code=400)
+        raise BadRequestException("Company admin user already exists")
 
     monkeypatch.setattr(CompanyService, "_create_company_admin", failing_create_company_admin)
 

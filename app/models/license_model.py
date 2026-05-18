@@ -14,17 +14,12 @@ class CompanySnapshot(BaseModel):
     short_name: str
 
 
-class PackageInfo(BaseModel):
-    name: PackageName
-    description: str
-
-
 class License(TimeStampedDocument):
     id: str = Field(default_factory=lambda: str(uuid4()))
     start_date: datetime
     end_date: datetime
     company: CompanySnapshot
-    packages: List[PackageInfo]
+    packages: List[PackageName]
     is_active: bool = True
 
     class Settings:

@@ -1,6 +1,6 @@
 import pytest
 
-from app.exceptions.AppException import AppException
+from app.exceptions.custom_exceptions import BadRequestException
 from app.services.integration_service import IntegrationService
 
 
@@ -19,7 +19,7 @@ async def test_integration_service_maps_user_duplicate_to_bad_request(monkeypatc
 
     monkeypatch.setattr("app.services.integration_service.httpx.AsyncClient.post", fake_post)
 
-    with pytest.raises(AppException) as exc_info:
+    with pytest.raises(BadRequestException) as exc_info:
         await IntegrationService().post(
             base_url="http://user-service.test",
             path="/api/v1/auth/register",
@@ -29,7 +29,7 @@ async def test_integration_service_maps_user_duplicate_to_bad_request(monkeypatc
         )
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.message == "Company admin user already exists"
+    assert exc_info.value.detail == "Company admin user already exists"
 
 
 @pytest.mark.asyncio

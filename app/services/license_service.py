@@ -1,11 +1,10 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import HTTPException, status
-
 from app.configs.config import settings
+from app.exceptions.custom_exceptions import BadRequestException
 from app.models.company_model import Company
-from app.models.license_model import CompanySnapshot, License, PackageInfo
+from app.models.license_model import CompanySnapshot, License
 from app.schemas.license_schema import CreateLicenseSchema, UpdateLicenseSchema
 from app.utils.date import add_days, has_expired
 
@@ -19,16 +18,10 @@ class LicenseService:
         end_date = self._as_utc(end_date)
 
         if end_date <= start_date:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="end_date must be greater than start_date",
-            )
+            raise BadRequestException("end_date must be greater than start_date")
 
         if is_active and end_date <= datetime.now(timezone.utc):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="end_date must be in the future for an active license",
-            )
+            raise BadRequestException("end_date must be in the future for an active license")
 
     async def get_all(self, skip: int, limit: int) -> List[License]:
         return await License.find_all().skip(skip).limit(limit).to_list()
@@ -82,7 +75,7 @@ class LicenseService:
                 name=company.name,
                 short_name=company.short_name,
             ),
-            packages=[PackageInfo(**package.model_dump()) for package in payload.packages],
+            packages=payload.packages,
             is_active=payload.is_active,
         )
 
@@ -104,9 +97,6 @@ class LicenseService:
             update_data["end_date"] = add_days(license_document.start_date, update_data["duration_days"])
 
         update_data.pop("duration_days", None)
-
-        if "packages" in update_data:
-            update_data["packages"] = [PackageInfo(**package) for package in update_data["packages"]]
 
         next_start_date = update_data.get("start_date", license_document.start_date)
         next_end_date = update_data.get("end_date", license_document.end_date)

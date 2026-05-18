@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from app.configs import logger
 from app.configs.config import settings
-from app.exceptions.AppException import AppException
+from app.exceptions.custom_exceptions import BadRequestException, IntegrationException
 from app.models.company_model import Company
 from app.schemas.company_schema import CreateCompanySchema, UpdateCompanySchema
 from app.services.integration_service import IntegrationService
@@ -102,29 +102,26 @@ class CompanyService:
 
     async def _create_company_operation_account(self, company: Company, auth_token: str | None = None) -> dict:
         account_payload = {
-            "label": f"{company.short_name} OPERATION",
             "currency": "XAF",
             "type": "OPERATION",
             "external_id": company.id,
             "external_class": "COMPANY",
+            "owner_type": "company",
             "owner_identity": {
                 "id": company.id,
-                "kind": "COMPANY",
                 "name": company.name,
-                "first_name": company.owner.first_name,
-                "last_name": company.owner.last_name,
-                "email": company.owner.email,
-                "phone": company.owner.phone,
+                "short_name": company.short_name,
+                "type": company.type,
             },
             "direct_momo": False,
             "status": "ACTIVE",
         }
         logger.info(
-            "Creating company operation account: company_id=%s external_class=%s type=%s label=%s",
+            "Creating company operation account: company_id=%s external_class=%s type=%s owner_name=%s",
             company.id,
             account_payload["external_class"],
             account_payload["type"],
-            account_payload["label"],
+            company.name,
         )
 
         return await self.integration_service.post(
@@ -168,8 +165,8 @@ class CompanyService:
                 service_name="Notification service",
                 auth_token=auth_token,
             )
-        except AppException as exc:
-            logger.warning("Company %s created but notification failed: %s", company.id, exc.message)
+        except (BadRequestException, IntegrationException) as exc:
+            logger.warning("Company %s created but notification failed: %s", company.id, exc.detail)
             return {}
 
     @staticmethod

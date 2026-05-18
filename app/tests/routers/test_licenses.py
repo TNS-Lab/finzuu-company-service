@@ -7,7 +7,7 @@ import app.auth.permissions as auth_permissions
 from app.configs.config import settings
 from app.main import app
 from app.models.company_model import Company
-from app.models.license_model import CompanySnapshot, License, PackageInfo
+from app.models.license_model import CompanySnapshot, License
 from app.services.license_service import LicenseService
 from app.tests import database
 
@@ -58,12 +58,7 @@ def company_payload(**overrides):
 def license_payload(company):
     return {
         "company_id": company.id,
-        "packages": [
-            {
-                "name": "READY_CASH",
-                "description": "Ready Cash package",
-            }
-        ],
+        "packages": ["READY_CASH"],
         "duration_days": 30,
         "is_active": True,
     }
@@ -83,7 +78,7 @@ async def test_get_all_licenses():
         start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
         end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
         company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
-        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        packages=["READY_CASH"],
         is_active=True,
     )
     await license_document.insert()
@@ -111,7 +106,7 @@ async def test_get_license_not_found():
     assert response_json["status_code"] == 404
     assert response_json["response_type"] == "Not Found"
     assert response_json["description"] == "License not found"
-    assert response_json["data"] == ""
+    assert response_json["data"] is None
 
 
 @pytest.mark.asyncio
@@ -129,7 +124,7 @@ async def test_create_license():
     assert response_json["response_type"] == "Success"
     assert response_json["description"] == "License created successfully"
     assert response_json["data"]["company"]["id"] == company.id
-    assert response_json["data"]["packages"][0]["name"] == "READY_CASH"
+    assert response_json["data"]["packages"][0] == "READY_CASH"
     assert response_json["data"]["is_active"] is True
 
 
@@ -141,7 +136,7 @@ async def test_create_license_company_not_found():
         "/api/v1/licenses/",
         json={
             "company_id": "unknown_id",
-            "packages": [{"name": "READY_CASH", "description": "Ready Cash package"}],
+            "packages": ["READY_CASH"],
             "duration_days": 30,
         },
         headers=AUTH_HEADERS,
@@ -210,7 +205,7 @@ async def test_get_licenses_by_company():
         start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
         end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
         company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
-        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        packages=["READY_CASH"],
         is_active=True,
     )
     await license_document.insert()
@@ -236,7 +231,7 @@ async def test_update_license():
         start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
         end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
         company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
-        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        packages=["READY_CASH"],
         is_active=True,
     )
     await license_document.insert()
@@ -244,7 +239,7 @@ async def test_update_license():
     response = client.put(
         f"/api/v1/licenses/{license_document.id}",
         json={
-            "packages": [{"name": "BULK", "description": "Bulk package"}],
+            "packages": ["BULK"],
             "is_active": False,
         },
         headers=AUTH_HEADERS,
@@ -253,7 +248,7 @@ async def test_update_license():
     assert response.status_code == 200
     response_json = response.json()
     assert response_json["description"] == "License updated"
-    assert response_json["data"]["packages"][0]["name"] == "BULK"
+    assert response_json["data"]["packages"][0] == "BULK"
     assert response_json["data"]["is_active"] is False
 
 
@@ -267,7 +262,7 @@ async def test_update_license_rejects_invalid_final_dates():
         start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
         end_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
         company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
-        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        packages=["READY_CASH"],
         is_active=True,
     )
     await license_document.insert()
@@ -297,7 +292,7 @@ async def test_expire_licenses_deactivates_outdated_active_licenses():
         start_date=datetime(2026, 5, 1, tzinfo=timezone.utc),
         end_date=datetime(2026, 5, 2, tzinfo=timezone.utc),
         company=CompanySnapshot(id=company.id, name=company.name, short_name=company.short_name),
-        packages=[PackageInfo(name="READY_CASH", description="Ready Cash package")],
+        packages=["READY_CASH"],
         is_active=True,
     )
     await expired_license.insert()

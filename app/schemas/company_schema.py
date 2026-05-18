@@ -3,7 +3,8 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.enums import CompanyType
-from app.models.company_model import AddressInfo, CorporationInfo, IdentityInfo
+from app.models.company_model import AddressInfo, CorporationInfo
+from app.models.external.identity_model import IdentityInfo
 
 
 class CompanyBaseSchema(BaseModel):

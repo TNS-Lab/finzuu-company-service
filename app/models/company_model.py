@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.enums import CompanyType
+from app.models.external.identity_model import IdentityInfo
 from app.models.time_stamped_model import TimeStampedDocument
-
-
-class IdentityInfo(BaseModel):
-    first_name: str
-    last_name: str
-    email: str
-    phone: str | None = None
-    identity_number: str | None = None
 
 
 class AddressInfo(BaseModel):
@@ -29,8 +21,6 @@ class AddressInfo(BaseModel):
     country: str = Field(..., description="Country code or country name")
     latitude: float | None = Field(default=None, description="Latitude")
     longitude: float | None = Field(default=None, description="Longitude")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class CorporationInfo(BaseModel):

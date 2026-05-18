@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_CONNECTION: str
+    DB_WITH_AUTH: bool = False
 
     DEFAULT_LICENSE_DURATION_DAYS: int = 365
     LICENSE_EXPIRATION_INTERVAL_SECONDS: int = 60 * 60 * 3

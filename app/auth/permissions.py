@@ -4,7 +4,7 @@ from fastapi import HTTPException, Request, status
 
 from app.configs import logger
 from app.configs.config import settings
-
+from app.exceptions.custom_exceptions import ForbiddenException, UnauthorizedException
 
 PUBLIC_PATHS = {
     "/health",
@@ -37,10 +37,7 @@ def require_permissions(*permissions: str):
 
         auth_header = get_auth_header(request)
         if not auth_header:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
+            raise UnauthorizedException("Authentication required")
 
         if not settings.AUTH_API:
             logger.error("Authentication service is not configured")
@@ -77,15 +74,9 @@ def require_permissions(*permissions: str):
 
         if response.status_code == status.HTTP_401_UNAUTHORIZED:
             logger.warning("Authentication rejected by auth service with status %s", response.status_code)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
+            raise UnauthorizedException("Authentication required")
 
         logger.warning("Permission denied by auth service with status %s", response.status_code)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+        raise ForbiddenException("Access denied")
 
     return permission_checker

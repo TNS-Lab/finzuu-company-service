@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, status
 
 from app.auth.permissions import require_permissions
 from app.enums import Permission
+from app.exceptions.custom_exceptions import BadRequestException, NotFoundException
 from app.models.company_model import Company
 from app.models.license_model import License
 from app.schemas.license_schema import CreateLicenseSchema, UpdateLicenseSchema
@@ -16,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK, response_model=ApiPaginateResponse)
-async def get_all(limit: int = 10, page: int = 1, __=Depends(require_permissions(Permission.COMPANY_LICENSE_READ))):
+async def get_all(limit: int = 10, page: int = 1, __=Depends(require_permissions(Permission.LICENSE_READ))):
     skip = get_skip_value(page, limit)
     data = await LicenseService().get_all(skip, limit)
     paginate = await pagination(License, limit, page)
@@ -31,16 +32,10 @@ async def get_all(limit: int = 10, page: int = 1, __=Depends(require_permissions
 
 
 @router.get("/company/{company_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def get_by_company(company_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_LICENSE_READ))):
+async def get_by_company(company_id: str, __=Depends(require_permissions(Permission.LICENSE_READ))):
     company = await CompanyService().get_by_id(company_id)
     if not company:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "status_code": status.HTTP_404_NOT_FOUND,
-            "response_type": "Not Found",
-            "description": "Company not found",
-            "data": "",
-        }
+        raise NotFoundException("Company not found")
 
     licenses = await LicenseService().get_by_company_id(company_id)
 
@@ -57,17 +52,11 @@ async def get_by_company(company_id: str, response: Response, __=Depends(require
 
 
 @router.get("/{license_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def get(license_id: str, response: Response, __=Depends(require_permissions(Permission.COMPANY_LICENSE_READ))):
+async def get(license_id: str, __=Depends(require_permissions(Permission.LICENSE_READ))):
     data = await LicenseService().get_by_id(license_id)
 
     if not data:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "status_code": status.HTTP_404_NOT_FOUND,
-            "response_type": "Not Found",
-            "description": "License not found",
-            "data": "",
-        }
+        raise NotFoundException("License not found")
 
     return {
         "status_code": status.HTTP_200_OK,
@@ -78,26 +67,14 @@ async def get(license_id: str, response: Response, __=Depends(require_permission
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ApiResponse)
-async def create_license(payload: CreateLicenseSchema, response: Response, __=Depends(require_permissions(Permission.COMPANY_LICENSE_CREATE))):
+async def create_license(payload: CreateLicenseSchema, __=Depends(require_permissions(Permission.LICENSE_CREATE))):
     company = await Company.get(payload.company_id)
     if not company:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "status_code": status.HTTP_404_NOT_FOUND,
-            "response_type": "Not Found",
-            "description": "Company not found",
-            "data": "",
-        }
+        raise NotFoundException("Company not found")
 
     active_license = await LicenseService().get_active_license(payload.company_id)
     if active_license:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return {
-            "status_code": status.HTTP_400_BAD_REQUEST,
-            "response_type": "Bad Request",
-            "description": "An active license already exists for this company",
-            "data": "",
-        }
+        raise BadRequestException("An active license already exists for this company")
 
     new_license = await LicenseService().create(payload)
 
@@ -110,17 +87,11 @@ async def create_license(payload: CreateLicenseSchema, response: Response, __=De
 
 
 @router.put("/{license_id}", status_code=status.HTTP_200_OK, response_model=ApiResponse)
-async def update_license(license_id: str, payload: UpdateLicenseSchema, response: Response, __=Depends(require_permissions(Permission.COMPANY_LICENSE_UPDATE))):
+async def update_license(license_id: str, payload: UpdateLicenseSchema, __=Depends(require_permissions(Permission.LICENSE_UPDATE))):
     license_document = await LicenseService().get_by_id(license_id)
 
     if not license_document:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "status_code": status.HTTP_404_NOT_FOUND,
-            "response_type": "Not Found",
-            "description": "License not found",
-            "data": "",
-        }
+        raise NotFoundException("License not found")
 
     updated_license = await LicenseService().update(license_id, payload)
 
